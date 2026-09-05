@@ -1,0 +1,21 @@
+name: Update NFL win totals
+
+on:
+  schedule:
+    # 14:00 UTC = 9:00 AM Eastern / 8:00 AM Central, every Tuesday
+    - cron: '0 14 * * 2'
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab too
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run update script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/update-wins.js

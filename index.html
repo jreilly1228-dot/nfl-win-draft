@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Win Total Draft</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0E1512; --panel:#161F19; --panel-2:#1C2620; --border:#2A362E;
+    --text:#EDEAE0; --text-dim:#8FA095; --gold:#C99A44; --gold-dim:#8A6E3B;
+    --afc:#C1584D; --nfc:#4C7FBE; --good:#5FA872; --bad:#C1584D; --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:40px;}
+  .wrap{max-width:640px;margin:0 auto;padding:18px 14px 0;}
+  header{padding:4px 2px 16px;}
+  h1{font-size:26px;font-weight:800;letter-spacing:-0.02em;margin:0 0 4px;}
+  h1 span{color:var(--gold);}
+  .sub{color:var(--text-dim);font-size:13.5px;line-height:1.4;}
+  .tabs{display:flex;gap:2px;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius);padding:3px;margin:16px 0 18px;}
+  .tab{flex:1;text-align:center;padding:9px 4px;font-size:13.5px;font-weight:600;color:var(--text-dim);border-radius:7px;cursor:pointer;}
+  .tab.active{background:var(--gold);color:#1A1200;}
+  .view{display:none;} .view.active{display:block;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;}
+  .panel-title{font-size:11.5px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;}
+  .division{margin-bottom:14px;} .division:last-child{margin-bottom:0;}
+  .division-name{font-size:12px;font-weight:700;color:var(--text-dim);margin:0 0 6px;}
+  .team-row{display:flex;align-items:center;justify-content:space-between;padding:9px 4px;border-bottom:1px solid var(--border);gap:8px;}
+  .team-row:last-child{border-bottom:none;}
+  .team-name{font-size:14.5px;font-weight:600;flex:1;}
+  .team-line{font-size:15px;font-weight:800;color:var(--gold);min-width:34px;text-align:right;}
+  .drafter-names{display:flex;flex-direction:column;gap:8px;}
+  .drafter-input-row{display:flex;align-items:center;gap:10px;}
+  .swatch{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .drafter-input{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:14px;font-weight:600;}
+  .pick-chip{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:20px;border:1px solid var(--border);color:var(--text-dim);white-space:nowrap;}
+  .pick-chip.p0{background:rgba(201,154,68,.2);border-color:var(--gold);color:var(--gold);}
+  .pick-chip.p1{background:rgba(76,127,190,.2);border-color:var(--nfc);color:#A9C6E8;}
+  .pick-chip.p2{background:rgba(193,88,77,.2);border-color:var(--afc);color:#E9A79E;}
+  .pick-chip-group{display:flex;align-items:center;gap:6px;}
+  .side-toggle{display:flex;gap:3px;}
+  .side-btn{width:23px;height:23px;border-radius:5px;border:1px solid var(--border);background:var(--panel-2);color:var(--text-dim);font-size:11px;font-weight:800;cursor:pointer;padding:0;}
+  .side-btn.on-over{background:var(--good);border-color:var(--good);color:#0B2013;}
+  .side-btn.on-under{background:var(--nfc);border-color:var(--nfc);color:#0B1A2B;}
+  .side-tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;border:1px solid var(--border);color:var(--text-dim);margin-left:5px;}
+  .side-tag.over{border-color:var(--good);color:var(--good);}
+  .side-tag.under{border-color:var(--nfc);color:#A9C6E8;}
+  .week-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .week-row label{font-size:13px;color:var(--text-dim);}
+  .week-input{width:64px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 8px;font-size:14px;text-align:center;font-weight:700;}
+  .leader-row{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);}
+  .leader-row:last-child{border-bottom:none;}
+  .rank{font-size:18px;font-weight:800;color:var(--text-dim);width:20px;}
+  .leader-info{flex:1;} .leader-name{font-size:14.5px;font-weight:700;}
+  .leader-sub{font-size:11.5px;color:var(--text-dim);margin-top:1px;}
+  .leader-diff{font-size:17px;font-weight:800;}
+  .pos{color:var(--good);} .neg{color:var(--bad);}
+  .drafter-card summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:2px 0 10px;}
+  .drafter-card summary::-webkit-details-marker{display:none;}
+  .card-title{font-size:15px;font-weight:800;} .card-total{font-size:13px;color:var(--text-dim);}
+  .track-row{display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--border);}
+  .track-row:last-child{border-bottom:none;}
+  .track-name{flex:1;font-size:13.5px;font-weight:600;}
+  .track-line{font-size:11.5px;color:var(--text-dim);width:44px;}
+  .wins-input{width:46px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 4px;text-align:center;font-size:14px;font-weight:700;}
+  .track-diff{width:44px;text-align:right;font-size:13px;font-weight:800;}
+  .status{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);font-size:11.5px;padding:6px 14px;border-radius:20px;}
+  .setup-warning{background:#2A1414;border:1px solid var(--afc);border-radius:var(--radius);padding:14px;margin-bottom:14px;font-size:13px;line-height:1.5;}
+  .lock-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .lock-btn{background:var(--gold);color:#1A1200;border:none;border-radius:20px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;}
+  .lock-btn.danger{background:transparent;color:var(--text-dim);border:1px solid var(--border);}
+  .locked-badge{display:flex;align-items:center;gap:8px;color:var(--good);font-weight:700;font-size:13.5px;}
+  .team-row.locked{opacity:.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Win Total <span>Draft</span></h1>
+    <div class="sub">2026 season &middot; 3-person snake draft &middot; 5 NFC + 5 AFC each</div>
+  </header>
+
+  <div id="setup-check"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="draft">Draft</div>
+    <div class="tab" data-tab="track">Tracker</div>
+  </div>
+
+  <div class="view active" id="view-draft">
+    <div class="panel">
+      <div class="panel-title">Drafters</div>
+      <div class="drafter-names" id="drafter-names"></div>
+    </div>
+    <div class="panel" id="lock-panel"></div>
+    <div class="panel">
+      <div class="panel-title">Tap a team to cycle drafter &middot; tap O/U to set side</div>
+      <div id="draft-panel"></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-track">
+    <div class="panel">
+      <div class="week-row">
+        <label>Weeks played this season</label>
+        <input type="number" class="week-input" id="week-input" min="0" max="18" value="1">
+      </div>
+      <div class="panel-title" style="margin-bottom:2px;">Standings (net edge vs. pace, on your side)</div>
+      <div id="leaderboard"></div>
+    </div>
+    <div id="drafter-cards"></div>
+  </div>
+</div>
+
+<div class="status" id="status">Connecting&hellip;</div>
+
+<script>
+// ====== FILL THESE IN (see README) ======
+const SUPABASE_URL = 'https://wpsrizrudeoomupudoiu.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'sb_publishable_ZdaVv6dpqU3YjoLG62b3IA_jnExn3ft';
+// =========================================
+
+let sb = null;
+let teams = [];
+let meta = { drafter_names: ['Player 1','Player 2','Player 3'], week: 1 };
+const DIVISIONS = ["East","North","South","West"];
+const PLAYER_COLORS = ["p0","p1","p2"];
+
+function setStatus(txt){ document.getElementById('status').textContent = txt; }
+
+async function init(){
+  if(SUPABASE_URL.includes('YOUR_') || SUPABASE_ANON_KEY.includes('YOUR_')){
+    document.getElementById('setup-check').innerHTML =
+      '<div class="setup-warning">Add your Supabase URL and anon key at the top of index.html before this will work. See README.md.</div>';
+    setStatus('Not configured');
+    return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  await refresh();
+
+  sb.channel('teams-changes')
+    .on('postgres_changes', {event:'*', schema:'public', table:'teams'}, refresh)
+    .subscribe();
+  sb.channel('meta-changes')
+    .on('postgres_changes', {event:'*', schema:'public', table:'draft_meta'}, refresh)
+    .subscribe();
+
+  setStatus('Live');
+}
+
+async function refresh(){
+  const { data: teamData, error: e1 } = await sb.from('teams').select('*').order('line', {ascending:false});
+  const { data: metaData, error: e2 } = await sb.from('draft_meta').select('*').eq('id',1).single();
+  if(e1 || e2){ setStatus('Error loading data'); console.error(e1||e2); return; }
+  teams = teamData;
+  meta = metaData;
+  renderAll();
+}
+
+function fmtLine(n){ return Number(n).toFixed(1); }
+function paceExpected(line, week){ return Math.round((line/17*week)*10)/10; }
+
+function renderDrafterNames(){
+  const wrap = document.getElementById('drafter-names');
+  wrap.innerHTML = '';
+  meta.drafter_names.forEach((name,i)=>{
+    const row = document.createElement('div');
+    row.className = 'drafter-input-row';
+    row.innerHTML = `<div class="swatch" style="background:${i===0?'var(--gold)':(i===1?'var(--nfc)':'var(--afc)')}"></div>`;
+    const input = document.createElement('input');
+    input.className = 'drafter-input';
+    input.value = name;
+    input.addEventListener('change', async e=>{
+      const names = [...meta.drafter_names];
+      names[i] = e.target.value;
+      await sb.from('draft_meta').update({drafter_names: names}).eq('id',1);
+    });
+    row.appendChild(input);
+    wrap.appendChild(row);
+  });
+}
+
+function renderLockPanel(){
+  const panel = document.getElementById('lock-panel');
+  if(meta.draft_locked){
+    panel.innerHTML = `
+      <div class="lock-row">
+        <div class="locked-badge">&#128274; Draft is locked</div>
+        <button class="lock-btn danger" id="unlock-btn">Unlock</button>
+      </div>
+    `;
+    document.getElementById('unlock-btn').addEventListener('click', async ()=>{
+      if(!confirm('Unlock the draft? Anyone with the link will be able to change picks again.')) return;
+      await sb.from('draft_meta').update({draft_locked:false}).eq('id',1);
+    });
+  } else {
+    panel.innerHTML = `
+      <div class="lock-row">
+        <div style="font-size:12.5px;color:var(--text-dim);">Once everyone's happy with the draft, lock it so picks can't change.</div>
+        <button class="lock-btn" id="lock-btn">Lock draft</button>
+      </div>
+    `;
+    document.getElementById('lock-btn').addEventListener('click', async ()=>{
+      if(!confirm('Lock the draft? No one will be able to reassign teams or change sides after this (win totals can still be updated).')) return;
+      await sb.from('draft_meta').update({draft_locked:true}).eq('id',1);
+    });
+  }
+}
+
+function renderDraftPanel(){
+  const panel = document.getElementById('draft-panel');
+  panel.innerHTML = '';
+  ["AFC","NFC"].forEach(conf=>{
+    DIVISIONS.forEach(div=>{
+      const list = teams.filter(t=>t.conference===conf && t.division===div);
+      if(list.length===0) return;
+      const block = document.createElement('div');
+      block.className = 'division';
+      block.innerHTML = `<div class="division-name">${conf} ${div}</div>`;
+      list.forEach(t=>{
+        const row = document.createElement('div');
+        row.className = 'team-row' + (meta.draft_locked ? ' locked' : '');
+        const assigned = t.drafter;
+        const side = t.side || 'over';
+        const chipHtml = (assigned===0||assigned===1||assigned===2)
+          ? `<div class="pick-chip-group">
+               <div class="pick-chip ${PLAYER_COLORS[assigned]}">${meta.drafter_names[assigned]}</div>
+               <div class="side-toggle">
+                 <button type="button" class="side-btn ${side==='over'?'on-over':''}" data-side="over">O</button>
+                 <button type="button" class="side-btn ${side==='under'?'on-under':''}" data-side="under">U</button>
+               </div>
+             </div>`
+          : `<div class="pick-chip">Unassigned</div>`;
+        row.innerHTML = `<div class="team-name">${t.name} <span style="color:var(--text-dim);font-weight:400;">(${fmtLine(t.line)})</span></div>${chipHtml}`;
+        if(!meta.draft_locked){
+          row.addEventListener('click', async ()=>{
+            let next;
+            if(t.drafter===null||t.drafter===undefined) next = {drafter:0, side:'over'};
+            else if(t.drafter===0) next = {drafter:1, side:'over'};
+            else if(t.drafter===1) next = {drafter:2, side:'over'};
+            else next = {drafter:null, side:null};
+            await sb.from('teams').update(next).eq('id', t.id);
+          });
+          row.querySelectorAll('.side-btn').forEach(btn=>{
+            btn.addEventListener('click', async e=>{
+              e.stopPropagation();
+              await sb.from('teams').update({side: btn.dataset.side}).eq('id', t.id);
+            });
+          });
+        }
+        block.appendChild(row);
+      });
+      panel.appendChild(block);
+    });
+  });
+}
+
+function renderLeaderboard(){
+  const week = meta.week;
+  const rows = [0,1,2].map(i=>{
+    const mine = teams.filter(t=>t.drafter===i);
+    const winSum = mine.reduce((s,t)=>s+(t.wins||0),0);
+    let edgeSum=0, overCount=0, underCount=0;
+    mine.forEach(t=>{
+      const side = t.side || 'over';
+      if(side==='under') underCount++; else overCount++;
+      const raw = (t.wins||0) - paceExpected(t.line, week);
+      edgeSum += side==='under' ? -raw : raw;
+    });
+    edgeSum = Math.round(edgeSum*10)/10;
+    return {i, name: meta.drafter_names[i], winSum, edgeSum, count: mine.length, overCount, underCount};
+  }).sort((a,b)=>b.edgeSum-a.edgeSum);
+
+  const board = document.getElementById('leaderboard');
+  board.innerHTML = '';
+  rows.forEach((r,idx)=>{
+    const diffClass = r.edgeSum>0?'pos':(r.edgeSum<0?'neg':'');
+    const diffStr = (r.edgeSum>0?'+':'')+r.edgeSum.toFixed(1);
+    const row = document.createElement('div');
+    row.className = 'leader-row';
+    row.innerHTML = `
+      <div class="rank">${idx+1}</div>
+      <div class="leader-info">
+        <div class="leader-name">${r.name}</div>
+        <div class="leader-sub">${r.count} teams (${r.overCount} O / ${r.underCount} U) &middot; ${r.winSum} actual wins</div>
+      </div>
+      <div class="leader-diff ${diffClass}">${diffStr}</div>
+    `;
+    board.appendChild(row);
+  });
+}
+
+function renderDrafterCards(){
+  const week = meta.week;
+  const wrap = document.getElementById('drafter-cards');
+  wrap.innerHTML = '';
+  for(let i=0;i<3;i++){
+    const mine = teams.filter(t=>t.drafter===i).sort((a,b)=>b.line-a.line);
+    const winSum = mine.reduce((s,t)=>s+(t.wins||0),0);
+    const lineSum = mine.reduce((s,t)=>s+Number(t.line),0);
+    const details = document.createElement('details');
+    details.className = 'drafter-card panel';
+    details.open = true;
+    const summary = document.createElement('summary');
+    summary.innerHTML = `<div class="card-title">${meta.drafter_names[i]}</div><div class="card-total">${winSum} / ${lineSum.toFixed(1)} wins</div>`;
+    details.appendChild(summary);
+    const list = document.createElement('div');
+    mine.forEach(t=>{
+      const wins = t.wins||0;
+      const side = t.side || 'over';
+      const expected = paceExpected(t.line, week);
+      const raw = Math.round((wins-expected)*10)/10;
+      const edge = side==='under' ? -raw : raw;
+      const diffClass = edge>0?'pos':(edge<0?'neg':'');
+      const diffStr = (edge>0?'+':'')+edge.toFixed(1);
+      const row = document.createElement('div');
+      row.className = 'track-row';
+      row.innerHTML = `
+        <div class="track-name">${t.name}<span class="side-tag ${side}">${side==='under'?'U':'O'}</span></div>
+        <div class="track-line">line ${fmtLine(t.line)}</div>
+        <input type="number" class="wins-input" min="0" max="17" value="${wins}">
+        <div class="track-diff ${diffClass}">${diffStr}</div>
+      `;
+      row.querySelector('.wins-input').addEventListener('change', async e=>{
+        const v = Math.max(0, Math.min(17, Number(e.target.value)||0));
+        await sb.from('teams').update({wins: v}).eq('id', t.id);
+      });
+      list.appendChild(row);
+    });
+    details.appendChild(list);
+    wrap.appendChild(details);
+  }
+}
+
+function renderAll(){
+  renderDrafterNames();
+  renderLockPanel();
+  renderDraftPanel();
+  document.getElementById('week-input').value = meta.week;
+  renderLeaderboard();
+  renderDrafterCards();
+}
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+tab.dataset.tab).classList.add('active');
+  });
+});
+document.getElementById('week-input').addEventListener('change', async e=>{
+  const week = Math.max(0, Math.min(18, Number(e.target.value)||0));
+  await sb.from('draft_meta').update({week}).eq('id',1);
+});
+
+init();
+</script>
+</body>
+</html>
